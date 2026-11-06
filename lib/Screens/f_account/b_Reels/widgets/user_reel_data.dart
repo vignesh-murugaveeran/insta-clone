@@ -1,0 +1,117 @@
+import 'package:insta_clone2/consts/images.dart';
+import 'package:insta_clone2/models/reel_model.dart';
+
+// User's own reels
+List<ReelModel> userReels = [
+  ReelModel(
+    id: 'user_1',
+    videoUrl: video1,
+    thumbnail: img1,
+    caption: 'My beach vacation! 🏖️',
+    userName: 'vicky_345',
+    userImage: img1,
+    userId: 'user_123',
+    likes: 12500,
+    views: 152000,
+    comments: 245,
+    shares: 45,
+    timestamp: DateTime.now().subtract(Duration(days: 1)),
+    isLiked: true,
+    isBookmarked: false,
+    isPublic: false, // User's own reel
+  ),
+  ReelModel(
+    id: 'user_2',
+    videoUrl: video2,
+    thumbnail: img2,
+    caption: 'Morning coffee routine ☕',
+    userName: 'vicky_345',
+    userImage: img1,
+    userId: 'user_123',
+    likes: 8900,
+    views: 98000,
+    comments: 156,
+    shares: 23,
+    timestamp: DateTime.now().subtract(Duration(days: 3)),
+    isLiked: false,
+    isBookmarked: true,
+    isPublic: false,
+  ),
+];
+
+// Public reels from other users
+List<ReelModel> publicReels = [
+  ReelModel(
+    id: 'public_1',
+    videoUrl: video1,
+    thumbnail: img2,
+    caption: 'Amazing sunset view! 🌅',
+    userName: 'travel_lover',
+    userImage: img2,
+    userId: 'user_456',
+    likes: 45200,
+    views: 589000,
+    comments: 1245,
+    shares: 289,
+    timestamp: DateTime.now().subtract(Duration(hours: 5)),
+    isLiked: true,
+    isBookmarked: false,
+    isPublic: true,
+  ),
+  ReelModel(
+    id: 'public_2',
+    videoUrl: video2,
+    thumbnail: img1,
+    caption: 'Cooking delicious pasta 🍝',
+    userName: 'foodie_queen',
+    userImage: img1,
+    userId: 'user_789',
+    likes: 28900,
+    views: 356000,
+    comments: 856,
+    shares: 167,
+    timestamp: DateTime.now().subtract(Duration(hours: 12)),
+    isLiked: false,
+    isBookmarked: true,
+    isPublic: true,
+  ),
+  ReelModel(
+    id: 'public_3',
+    videoUrl: video1,
+    thumbnail: img2,
+    caption: 'Workout motivation 💪',
+    userName: 'fitness_guru',
+    userImage: img2,
+    userId: 'user_101',
+    likes: 67800,
+    views: 892000,
+    comments: 2345,
+    shares: 456,
+    timestamp: DateTime.now().subtract(Duration(days: 1)),
+    isLiked: true,
+    isBookmarked: false,
+    isPublic: true,
+  ),
+  ReelModel(
+    id: 'public_4',
+    videoUrl: video2,
+    thumbnail: img1,
+    caption: 'Art and creativity 🎨',
+    userName: 'creative_mind',
+    userImage: img1,
+    userId: 'user_202',
+    likes: 34200,
+    views: 423000,
+    comments: 678,
+    shares: 134,
+    timestamp: DateTime.now().subtract(Duration(days: 2)),
+    isLiked: false,
+    isBookmarked: false,
+    isPublic: true,
+  ),
+];
+
+// Combined reels for the feed
+List<ReelModel> getAllReels() {
+  return [...userReels, ...publicReels];
+}

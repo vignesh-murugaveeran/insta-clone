@@ -1,0 +1,581 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:camera/camera.dart';
+
+class ReelCreationScreen extends StatefulWidget {
+  const ReelCreationScreen({super.key});
+
+  @override
+  State<ReelCreationScreen> createState() => _ReelCreationScreenState();
+}
+
+class _ReelCreationScreenState extends State<ReelCreationScreen>
+    with WidgetsBindingObserver {
+  CameraController? _controller;
+  List<CameraDescription>? _cameras;
+  bool _isRecording = false;
+  bool _isCameraInitialized = false;
+  bool _isFrontCamera = false;
+  double _recordingProgress = 0.0;
+  FlashMode _currentFlashMode = FlashMode.off;
+  bool _hasFlash = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initializeCamera();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_controller == null || !_controller!.value.isInitialized) {
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive) {
+      _controller?.dispose();
+    } else if (state == AppLifecycleState.resumed) {
+      if (_controller != null) {
+        _initializeCamera();
+      }
+    }
+  }
+
+  Future<void> _initializeCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras!.isEmpty) {
+        throw Exception('No cameras found');
+      }
+
+      final camera = _isFrontCamera
+          ? _cameras!.firstWhere(
+              (camera) => camera.lensDirection == CameraLensDirection.front,
+              orElse: () => _cameras!.first,
+            )
+          : _cameras!.firstWhere(
+              (camera) => camera.lensDirection == CameraLensDirection.back,
+              orElse: () => _cameras!.first,
+            );
+
+      _controller = CameraController(
+        camera,
+        ResolutionPreset.high,
+        enableAudio: true,
+      );
+
+      await _controller!.initialize();
+
+      // Check if flash is available (only for back camera)
+      _hasFlash = !_isFrontCamera && _controller!.value.flashMode != null;
+
+      // Set initial flash mode
+      if (_hasFlash) {
+        await _controller!.setFlashMode(_currentFlashMode);
+      }
+
+      setState(() {
+        _isCameraInitialized = true;
+      });
+    } catch (e) {
+      print('Error initializing camera: $e');
+      setState(() {
+        _isCameraInitialized = false;
+      });
+    }
+  }
+
+  void _switchCamera() async {
+    if (_cameras == null || _cameras!.length < 2) return;
+
+    setState(() {
+      _isCameraInitialized = false;
+      _isFrontCamera = !_isFrontCamera;
+    });
+
+    await _controller?.dispose();
+    await _initializeCamera();
+  }
+
+  void _toggleFlash() async {
+    if (_controller == null || !_controller!.value.isInitialized || !_hasFlash)
+      return;
+
+    FlashMode newFlashMode;
+    switch (_currentFlashMode) {
+      case FlashMode.off:
+        newFlashMode = FlashMode.auto;
+        break;
+      case FlashMode.auto:
+        newFlashMode = FlashMode.always;
+        break;
+      case FlashMode.always:
+        newFlashMode = FlashMode.off;
+        break;
+      case FlashMode.torch:
+        newFlashMode = FlashMode.off;
+        break;
+    }
+
+    try {
+      await _controller!.setFlashMode(newFlashMode);
+      setState(() {
+        _currentFlashMode = newFlashMode;
+      });
+    } catch (e) {
+      print('Error setting flash mode: $e');
+    }
+  }
+
+  void _startRecording() async {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+
+    try {
+      await _controller!.startVideoRecording();
+      setState(() {
+        _isRecording = true;
+        _recordingProgress = 0.0;
+      });
+
+      // Simulate recording progress (in real app, use actual duration)
+      _simulateRecordingProgress();
+    } catch (e) {
+      print('Error starting recording: $e');
+    }
+  }
+
+  void _stopRecording() async {
+    if (!_isRecording) return;
+
+    try {
+      final videoFile = await _controller!.stopVideoRecording();
+      setState(() {
+        _isRecording = false;
+        _recordingProgress = 0.0;
+      });
+
+      // Here you can process the recorded video
+      print('Video saved to: ${videoFile.path}');
+
+      // Show success message
+      Get.snackbar(
+        'Success',
+        'Reel recorded successfully!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      print('Error stopping recording: $e');
+    }
+  }
+
+  void _simulateRecordingProgress() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_isRecording && _recordingProgress < 1.0) {
+        setState(() {
+          _recordingProgress += 0.01;
+        });
+        _simulateRecordingProgress();
+      } else if (_recordingProgress >= 1.0) {
+        _stopRecording();
+      }
+    });
+  }
+
+  IconData _getFlashIcon() {
+    if (!_hasFlash) return Icons.flash_off;
+
+    switch (_currentFlashMode) {
+      case FlashMode.off:
+        return Icons.flash_off;
+      case FlashMode.auto:
+        return Icons.flash_auto;
+      case FlashMode.always:
+        return Icons.flash_on;
+      case FlashMode.torch:
+        return Icons.highlight;
+    }
+  }
+
+  String _getFlashLabel() {
+    if (!_hasFlash) return 'No Flash';
+
+    switch (_currentFlashMode) {
+      case FlashMode.off:
+        return 'Off';
+      case FlashMode.auto:
+        return 'Auto';
+      case FlashMode.always:
+        return 'On';
+      case FlashMode.torch:
+        return 'Torch';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white, size: 30),
+          onPressed: () => Get.back(),
+        ),
+        title: const Text(
+          'Reel',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.flip_camera_ios,
+              color: Colors.white,
+              size: 29,
+            ),
+            onPressed: _switchCamera,
+          ),
+          // IconButton(
+          //   icon: const Icon(Icons.music_note, color: Colors.white),
+          //   onPressed: () {
+          //     // Open music selection
+          //     Get.snackbar(
+          //       'Music',
+          //       'Music selection coming soon!',
+          //       snackPosition: SnackPosition.BOTTOM,
+          //     );
+          //   },
+          // ),
+          if (_hasFlash) ...[
+            const SizedBox(height: 20),
+            _buildVerticalControlButton(
+              _getFlashIcon(),
+              _getFlashLabel(),
+              _toggleFlash,
+            ),
+          ],
+        ],
+      ),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Camera Preview Area
+            if (_isCameraInitialized && _controller != null)
+              Container(
+                width: double.infinity,
+                height: MediaQuery.of(context).size.height,
+                child: CameraPreview(_controller!),
+              )
+            else
+              Container(
+                width: double.infinity,
+                height: MediaQuery.of(context).size.height,
+                color: Colors.grey[900],
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(color: Colors.white),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Initializing Camera...',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    if (!_isCameraInitialized)
+                      TextButton(
+                        onPressed: _initializeCamera,
+                        child: const Text(
+                          'Retry',
+                          style: TextStyle(color: Colors.blue),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+            // Recording Progress Bar
+            if (_isRecording)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: LinearProgressIndicator(
+                  value: _recordingProgress,
+                  backgroundColor: Colors.grey[800],
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.red),
+                ),
+              ),
+
+            // Bottom Controls
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Gallery and Effects Row
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Gallery
+                          _buildControlButton(
+                            Icons.photo_library,
+                            'Gallery',
+                            () {
+                              Get.snackbar(
+                                'Gallery',
+                                'Gallery access coming soon!',
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                            },
+                          ),
+                          // Effects
+                          _buildControlButton(
+                            Icons.auto_awesome,
+                            'Effects',
+                            () {
+                              Get.snackbar(
+                                'Effects',
+                                'Effects coming soon!',
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                            },
+                          ),
+                          // Timer
+                          _buildControlButton(Icons.timer, 'Timer', () {
+                            Get.snackbar(
+                              'Timer',
+                              'Timer coming soon!',
+                              snackPosition: SnackPosition.BOTTOM,
+                            );
+                          }),
+                          // Music
+                          _buildControlButton(Icons.music_note, 'Music', () {
+                            Get.snackbar(
+                              'Music',
+                              'Music coming soon!',
+                              snackPosition: SnackPosition.BOTTOM,
+                            );
+                          }),
+                          // Layout
+                          // _buildControlButton(Icons.grid_view, 'Layout', () {
+                          //   Get.snackbar(
+                          //     'Layout',
+                          //     'Layout options coming soon!',
+                          //     snackPosition: SnackPosition.BOTTOM,
+                          //   );
+                          // }),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Record Button
+                    GestureDetector(
+                      onTapDown: (_) => _startRecording(),
+                      onTapUp: (_) => _stopRecording(),
+                      onTapCancel: _stopRecording,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: _isRecording ? 70 : 80,
+                        height: _isRecording ? 70 : 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _isRecording ? Colors.red : Colors.white,
+                            width: _isRecording ? 3 : 4,
+                          ),
+                        ),
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _isRecording ? Colors.red : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Right Side Controls
+            // Positioned(
+            //   right: 10,
+            //   top: MediaQuery.of(context).size.height * 0.1,
+            //   child: Column(
+            //     children: [
+            //       _buildVerticalControlButton(
+            //         Icons.flip_camera_ios,
+            //         'Flip',
+            //         _switchCamera,
+            //       ),
+            //       const SizedBox(height: 20),
+            //       _buildVerticalControlButton(Icons.speed, 'Speed', () {
+            //         Get.snackbar(
+            //           'Speed',
+            //           'Speed controls coming soon!',
+            //           snackPosition: SnackPosition.BOTTOM,
+            //         );
+            //       }),
+            //       const SizedBox(height: 20),
+            //       _buildVerticalControlButton(Icons.timer, 'Timer', () {
+            //         Get.snackbar(
+            //           'Timer',
+            //           'Timer controls coming soon!',
+            //           snackPosition: SnackPosition.BOTTOM,
+            //         );
+            //       }),
+            //       if (_hasFlash) ...[
+            //         const SizedBox(height: 20),
+            //         _buildVerticalControlButton(
+            //           _getFlashIcon(),
+            //           _getFlashLabel(),
+            //           _toggleFlash,
+            //         ),
+            //       ],
+            //     ],
+            //   ),
+            // ),
+
+            // Recording Indicator
+            if (_isRecording)
+              Positioned(
+                top: 50,
+                left: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Recording',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${(_recordingProgress * 100).toInt()}s',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Flash availability indicator
+            if (!_hasFlash && !_isFrontCamera)
+              Positioned(
+                top: 50,
+                right: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Flash not available',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildControlButton(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.white, size: 30),
+          const SizedBox(height: 5),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerticalControlButton(
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 27),
+          ),
+          const SizedBox(height: 5),
+          // Text(
+          //   label,
+          //   style: const TextStyle(color: Colors.white, fontSize: 12),
+          // ),
+        ],
+      ),
+    );
+  }
+}
